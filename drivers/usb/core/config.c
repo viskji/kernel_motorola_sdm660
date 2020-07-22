@@ -365,8 +365,8 @@ static int usb_parse_endpoint(struct device *ddev, int cfgno,
 	 * (see the end of section 5.6.3), so don't warn about them.
 	 */
 	maxp = usb_endpoint_maxp(&endpoint->desc);
-	if (maxp == 0 && !(usb_endpoint_xfer_isoc(d) && asnum == 0)) {
-		dev_warn(ddev, "config %d interface %d altsetting %d endpoint 0x%X has invalid wMaxPacketSize 0\n",
+	if (maxp == 0) {
+		dev_warn(ddev, "config %d interface %d altsetting %d endpoint 0x%X has wMaxPacketSize 0, skipping\n",
 		    cfgno, inum, asnum, d->bEndpointAddress);
 	}
 

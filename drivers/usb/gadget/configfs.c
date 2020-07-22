@@ -90,6 +90,8 @@ struct gadget_info {
 	bool unbinding;
 	char b_vendor_code;
 	char qw_sign[OS_STRING_QW_SIGN_LEN];
+	spinlock_t spinlock;
+	bool unbind;
 #ifdef CONFIG_USB_CONFIGFS_UEVENT
 	bool connected;
 	bool sw_connected;
@@ -1641,71 +1643,8 @@ out:
 
 static DEVICE_ATTR(state, S_IRUGO, state_show, NULL);
 
-static ssize_t secure_show(struct device *pdev, struct device_attribute *attr,
-			char *buf)
-{
-	struct gadget_info *gi = dev_get_drvdata(pdev);
-
-	if (!gi)
-		return -ENODEV;
-
-	return scnprintf(buf, PAGE_SIZE, "%d\n", gi->secure);
-}
-
-static ssize_t secure_store(struct device *pdev, struct device_attribute *attr,
-			const char *buf, size_t count)
-{
-	struct gadget_info *gi = dev_get_drvdata(pdev);
-	unsigned long mode, r;
-	int ret;
-
-	if (!gi)
-		return -ENODEV;
-
-	r = kstrtoul(buf, 0, &mode);
-	if (r) {
-		dev_err(pdev, "Invalid value = %lu\n", mode);
-		return -EINVAL;
-	}
-
-	mode = !!mode;
-	if (mode == gi->secure)
-		return count;
-
-	mutex_lock(&gi->lock);
-
-	gi->secure = mode;
-
-	if (!gi->udc_name) {
-		mutex_unlock(&gi->lock);
-		return count;
-	}
-	log_event_dbg("Secure Store , UDC = %s, secure = %d\n",
-				gi->udc_name, gi->secure);
-
-	if (gi->secure) {
-		ret = usb_gadget_unregister_driver(
-				&gi->composite.gadget_driver);
-		if (ret)
-			log_event_err("Failed detaching UDC from gadget %d\n",
-					ret);
-	} else {
-		ret = usb_udc_attach_driver(gi->udc_name,
-				&gi->composite.gadget_driver);
-		if (ret)
-			log_event_err("Failed attaching UDC to gadget %d\n",
-					ret);
-	}
-	mutex_unlock(&gi->lock);
-
-	return count;
-}
-
-static DEVICE_ATTR(secure, S_IRUGO | S_IWUSR, secure_show, secure_store);
-
 static struct device_attribute *android_usb_attributes[] = {
 	&dev_attr_state,
-	&dev_attr_secure,
 	NULL
 };
 
@@ -1796,6 +1735,7 @@ static struct config_group *gadgets_make(
 	mutex_init(&gi->lock);
 	INIT_LIST_HEAD(&gi->string_list);
 	INIT_LIST_HEAD(&gi->available_func);
+	spin_lock_init(&gi->spinlock);
 
 	composite_init_dev(&gi->cdev);
 	gi->cdev.desc.bLength = USB_DT_DEVICE_SIZE;
