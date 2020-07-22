@@ -948,7 +948,6 @@ static void p54u_load_firmware_cb(const struct firmware *firmware,
 		usb_driver_release_interface(&p54u_driver, intf);
 		usb_unlock_device(udev);
 	}
-
 	usb_put_intf(intf);
 }
 
@@ -969,7 +968,6 @@ static int p54u_load_firmware(struct ieee80211_hw *dev,
 
 	dev_info(&priv->udev->dev, "Loading firmware file %s\n",
 	       p54u_fwlist[i].fw);
-
 	usb_get_intf(intf);
 	err = request_firmware_nowait(THIS_MODULE, 1, p54u_fwlist[i].fw,
 				      device, GFP_KERNEL, priv,
